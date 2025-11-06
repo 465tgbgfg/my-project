@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bhavin Dabhi | Portfolio</title>
+  <style>
+    .profile-img {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%; /* ગોળ દેખાશે */
+  border: 4px solid white;
+  margin-bottom: 20px;
+  object-fit: cover;
+   object-position: center top;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      background: #f4f4f4;
+      color: #333;
+      scroll-behavior: smooth;
+    }
+
+    header {
+      text-align: center;
+      background: linear-gradient(135deg, #0077ff, #00c6ff);
+      color: white;
+      padding: 60px 20px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2.5em;
+    }
+
+    header p {
+      font-size: 1.2em;
+      margin-top: 10px;
+    }
+
+    nav {
+      background: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: center;
+      padding: 10px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: #0077ff;
+      font-weight: 600;
+      margin: 0 15px;
+      transition: 0.3s;
+    }
+
+    nav a:hover {
+      color: #00c6ff;
+    }
+
+    section {
+      max-width: 900px;
+      margin: 40px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      color: #0077ff;
+      border-bottom: 2px solid #00c6ff;
+      display: inline-block;
+      margin-bottom: 15px;
+    }
+
+    .project {
+      margin-bottom: 20px;
+      background: #f9f9f9;
+      padding: 15px;
+      border-radius: 8px;
+      transition: 0.3s;
+    }
+
+    .project:hover {
+      transform: scale(1.02);
+      background: #eef6ff;
+    }
+
+    .project a {
+      color: #0077ff;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    ul li {
+      background: #eef6ff;
+      display: inline-block;
+      margin: 5px;
+      padding: 8px 15px;
+      border-radius: 8px;
+      font-weight: 500;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      background: #0077ff;
+      color: white;
+      margin-top: 40px;
+    }
+
+    footer a {
+      color: #fff;
+      text-decoration: underline;
+    }
+
+    /* Simple fade-in animation */
+    section {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+    }
+
+    section.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <img src="c:\.vscode\portfile.png.jpg" alt="Bhavin Dabhi" class="profile-img">
+    <h1>Bhavin Dabhi</h1>
+    <p>Frontend Developer</p>
+  </header>
+
+  <nav>
+    <a href="#about">About</a>
+    <a href="#projects">Projects</a>
+    <a href="#skills">Skills</a>
+    <a href="#contact">Contact</a>
+  </nav>
+
+  <section id="about">
+    <h2>About Me</h2>
+    <p>Hello! I'm <b>Bhavin Dabhi</b>, I’m a passionate Front-End Developer who loves creating clean, responsive, and user-friendly websites using HTML, CSS, and JavaScript.</p>
+  </section>
+
+  <section id="projects">
+    <h2>My Projects</h2>
+
+    <div class="project">
+      <h3>♟️chess game</h3>
+      <p>The Chess Game Project is an interactive two-player game based on the classic strategy board game — Chess. The project allows players to move pieces according to standard chess rules and focuses on creating an intelligent and user-friendly interface for learning and entertainment.</p>
+      <a href="c:\.vscode\chess game.html">🔗 View Project</a>
+    </div>
+
+    <div class="project">
+      <h3>🌬️air cool system</h3>
+      <p>The Air Cooler Project is a system designed to cool air efficiently using water evaporation technology. It works on the principle of converting hot air into cool and fresh air by passing it through wet cooling pads. The project aims to create an eco-friendly and cost-effective cooling solution that consumes less power compared to traditional air</p>
+      <a href="c:\.vscode\2site.html">🔗 View Project</a>
+    </div>
+
+    <div class="project">
+      <h3>🎨Validation Project</h3>
+      <p>A validation form is a web form that checks the information entered by a user before submitting it. It ensures that the data is correct, complete, and in the proper format. For example, it verifies that an email address contains “@”, a password is strong enough, or that required fields are not left empty.</p>
+      <a href="c:\.vscode\full data.html" target="_blank">🔗 View Project</a>
+
+    </div>
+  </section>
+
+  <section id="skills">
+    <h2>Skills</h2>
+    <ul>
+      <li>HTML</li>
+      <li>CSS</li>
+      <li>JavaScript</li>
+      <li>React (Basic)</li>
+      <li>PHP</li>
+      <li>Photoshop</li>
+      <li>Canva</li>
+    </ul>
+  </section>
+
+  <section id="contact">
+    <h2>Contact</h2>
+    <p>📞 9726469210</p>
+    <p>📧 Email: <a href="mailto:bhavindabhi580@gmail.com">bhavindabhi580@gmail.com</a></p>
+    <p>💼 GitHub: <a href="https://github.com/465tgbgfg/-turtle-flower-design.git">github.com/bhavin</a></p>
+    <p>🌐 LinkedIn: <a href="#">https://www.linkedin.com/in/bhavin-dabhi-ab8ab5375</a></p>
+  </section>
+
+  <footer>
+    <p>© 2025 Bhavin Dabhi | All Rights Reserved</p>
+  </footer>
+
+  <script>
+    // Simple scroll animation
+    const sections = document.querySelectorAll("section");
+    const reveal = () => {
+      sections.forEach(sec => {
+        const top = sec.getBoundingClientRect().top;
+        if (top < window.innerHeight - 100) sec.classList.add("visible");
+      });
+    };
+    window.addEventListener("scroll", reveal);
+    reveal();
+  </script>
+
+</body>
+</html>
