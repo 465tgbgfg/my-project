@@ -1,0 +1,570 @@
+// server.js
+// Single-file project: writes /public/index.html, /public/style.css, /public/client.js then starts server+ws
+const fs = require('fs');
+const path = require('path');
+const express = require('express');
+const http = require('http');
+const { WebSocketServer } = require('ws');
+
+const PUBLIC_DIR = path.join(__dirname, 'public');
+if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR);
+
+// ------------- index.html -------------
+const INDEX_HTML = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ultra Live Chat - Single File</title>
+
+  <link rel="stylesheet" href="/style.css">
+  <!-- highlight.js for code blocks (CDN) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Ultra Chat</div>
+      <div class="user-setup">
+        <input id="nameInput" placeholder="Enter your name" maxlength="30"/>
+        <button id="setNameBtn">Set</button>
+      </div>
+      <div class="presence">
+        <h4>Online</h4>
+        <ul id="usersList"></ul>
+      </div>
+    </aside>
+
+    <main class="chat">
+      <header class="chat-header">
+        <div class="room-title">Room: #main</div>
+        <div id="typingIndicator" class="typing"></div>
+      </header>
+
+      <div id="messages" class="messages" tabindex="0"></div>
+
+      <footer class="composer">
+        <div class="tools">
+          <input id="fileInput" type="file" />
+          <button id="emojiBtn">😊</button>
+        </div>
+        <textarea id="textInput" placeholder="Type a message (markdown supported)"></textarea>
+        <div class="controls">
+          <button id="sendBtn">Send</button>
+          <div id="status">Offline</div>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <template id="messageTpl">
+    <div class="message" data-id="">
+      <div class="meta">
+        <span class="from"></span>
+        <span class="time"></span>
+        <span class="status small"></span>
+      </div>
+      <div class="content"></div>
+      <div class="attachments"></div>
+      <div class="message-actions">
+        <button class="react">😀</button>
+        <button class="edit">Edit</button>
+        <button class="delete">Delete</button>
+        <button class="readBtn">Mark Read</button>
+      </div>
+      <div class="reactions small"></div>
+    </div>
+  </template>
+
+  <script src="/client.js"></script>
+</body>
+</html>
+`;
+
+// ------------- style.css -------------
+const STYLE_CSS = `:root{
+  --bg:#0f1724; --panel:#0b1220; --muted:#94a3b8; --accent:#7c3aed;
+  --glass: rgba(255,255,255,0.03);
+}
+*{box-sizing:border-box}
+html,body,#messages{height:100%}
+body{margin:0;font-family:Inter,Segoe UI,Arial;background:linear-gradient(180deg,#071028 0%, #071a2c 100%);color:#e6eef8}
+.app{display:flex;height:100vh}
+.sidebar{width:260px;background:var(--panel);padding:16px;display:flex;flex-direction:column;gap:12px}
+.brand{font-weight:700;font-size:20px;color:var(--accent);text-align:center}
+.user-setup{display:flex;gap:8px}
+.user-setup input{flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:var(--glass);color:inherit}
+.user-setup button{padding:8px 10px;border-radius:6px;background:var(--accent);border:none;color:white}
+.presence h4{margin:8px 0 6px;color:var(--muted);font-size:13px}
+.presence ul{list-style:none;padding:0;margin:0;overflow:auto;max-height:60vh}
+.presence li{padding:6px 8px;border-radius:6px;margin-bottom:6px;background:rgba(255,255,255,0.02);font-size:14px}
+
+.chat{flex:1;display:flex;flex-direction:column}
+.chat-header{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center}
+.messages{flex:1;padding:16px;overflow:auto}
+.message{background:rgba(255,255,255,0.02);padding:10px;border-radius:10px;margin-bottom:10px;max-width:75%}
+.message .meta{display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:6px}
+.message .content{white-space:pre-wrap;color:#e6eef8}
+.message .attachments img{max-width:200px;border-radius:8px;margin-top:8px}
+.message.you{margin-left:auto;background:linear-gradient(90deg,#12263b,#0f3a59)}
+.message-actions{display:flex;gap:6px;margin-top:8px}
+.small{font-size:11px;color:var(--muted)}
+.composer{padding:12px;border-top:1px solid rgba(255,255,255,0.02);display:flex;flex-direction:column;gap:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02))}
+.composer textarea{height:80px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit;resize:none}
+.controls{display:flex;justify-content:space-between;align-items:center}
+.tools{display:flex;gap:8px}
+#status{font-size:12px;color:var(--muted)}
+.typing{font-size:13px;color:var(--muted)}
+.reactions{display:flex;gap:6px;margin-top:6px}
+.reactions span{background:rgba(255,255,255,0.03);padding:3px 6px;border-radius:12px;font-size:12px}
+`;
+
+// ------------- client.js -------------
+const CLIENT_JS = `(() => {
+  // Simple utils
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  const genId = () => 'm_' + Math.random().toString(36).slice(2, 10);
+  const formatTime = (ts) => new Date(ts).toLocaleTimeString();
+
+  // Elements
+  const nameInput = $('#nameInput');
+  const setNameBtn = $('#setNameBtn');
+  const usersList = $('#usersList');
+  const messagesEl = $('#messages');
+  const textInput = $('#textInput');
+  const sendBtn = $('#sendBtn');
+  const fileInput = $('#fileInput');
+  const emojiBtn = $('#emojiBtn');
+  const typingIndicator = $('#typingIndicator');
+  const statusEl = $('#status');
+
+  // WebSocket
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(proto + '://' + location.host);
+
+  let myId = null;
+  let myName = 'Anonymous';
+  let typingTimeout = null;
+  let onlineUsers = [];
+  let pendingQueue = []; // messages to send when offline
+
+  // Basic local cache with IndexedDB (promisified)
+  const dbName = 'ultra_chat_db';
+  let db = null;
+  function openDB() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open(dbName, 1);
+      r.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains('messages')) d.createObjectStore('messages', { keyPath: 'id' });
+      };
+      r.onsuccess = e => { db = e.target.result; res(); };
+      r.onerror = e => rej(e);
+    });
+  }
+  function saveMsgLocal(msg) {
+    if (!db) return;
+    try {
+      const tx = db.transaction('messages','readwrite');
+      tx.objectStore('messages').put(msg);
+    } catch(e) {}
+  }
+  function loadMsgsLocal() {
+    return new Promise((res) => {
+      if (!db) return res([]);
+      const tx = db.transaction('messages','readonly');
+      const req = tx.objectStore('messages').getAll();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror = () => res([]);
+    });
+  }
+
+  // UI helpers
+  function makeMessageNode(m) {
+    const tpl = document.getElementById('messageTpl');
+    const node = tpl.content.cloneNode(true).firstElementChild;
+    node.dataset.id = m.id;
+    node.querySelector('.from').textContent = (m.fromName || '???');
+    node.querySelector('.time').textContent = formatTime(m.time);
+    node.querySelector('.status').textContent = m.status || '';
+    const content = node.querySelector('.content');
+    if (m.deleted) {
+      content.textContent = '[message deleted]';
+      content.style.fontStyle = 'italic';
+    } else {
+      // render markdown with simple code highlight using highlight.js
+      const md = markdownToHtml(m.text || '');
+      content.innerHTML = md;
+      // highlight any code blocks
+      requestAnimationFrame(() => {
+        $$('pre code', content).forEach(el => window.hljs?.highlightElement(el));
+      });
+    }
+
+    if (m.attachments && m.attachments.length) {
+      const aWrap = node.querySelector('.attachments');
+      m.attachments.forEach(att => {
+        if (att.type && att.type.startsWith('image/')) {
+          const img = document.createElement('img');
+          img.src = att.data;
+          aWrap.appendChild(img);
+        } else {
+          const link = document.createElement('a');
+          link.href = att.data;
+          link.download = att.name || 'file';
+          link.textContent = att.name || 'file';
+          aWrap.appendChild(link);
+        }
+      });
+    }
+
+    // reactions
+    const rWrap = node.querySelector('.reactions');
+    if (m.reactions) {
+      for (const [react, arr] of Object.entries(m.reactions)) {
+        const s = document.createElement('span');
+        s.textContent = react + ' ' + arr.length;
+        rWrap.appendChild(s);
+      }
+    }
+
+    // actions
+    node.querySelector('.react').addEventListener('click', () => {
+      const reaction = prompt('Type emoji (e.g. 😀)') || '👍';
+      send({ type: 'reaction', payload: { id: m.id, reaction, userId: myId }});
+    });
+    node.querySelector('.edit').addEventListener('click', () => {
+      if (m.from !== myId) return alert('You can edit only your messages');
+      const newText = prompt('Edit message', m.text);
+      if (newText != null) send({ type: 'message_edit', payload: { id: m.id, text: newText }});
+    });
+    node.querySelector('.delete').addEventListener('click', () => {
+      if (m.from !== myId) return alert('You can delete only your messages');
+      if (!confirm('Delete this message?')) return;
+      send({ type: 'message_delete', payload: { id: m.id }});
+    });
+    node.querySelector('.readBtn').addEventListener('click', () => {
+      send({ type: 'read', payload: { id: m.id, userId: myId }});
+    });
+
+    if (m.from === myId) node.classList.add('you');
+
+    return node;
+  }
+
+  function renderMessages(list) {
+    messagesEl.innerHTML = '';
+    list.forEach(m => messagesEl.appendChild(makeMessageNode(m)));
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function addOrUpdateMessage(m, replace = false) {
+    saveMsgLocal(m);
+    const existing = messagesEl.querySelector('[data-id=\"' + m.id + '\"]');
+    if (existing) {
+      const newNode = makeMessageNode(m);
+      messagesEl.replaceChild(newNode, existing);
+    } else {
+      messagesEl.appendChild(makeMessageNode(m));
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  }
+
+  // markdown -> html (minimal)
+  function markdownToHtml(md) {
+    if (!md) return '';
+    // code fences using triple backticks are supported: we escape them in regex safely
+    md = md.replace(/\\\`\\\`\\\`([\\s\\S]*?)\\\`\\\`\\\`/g, function(_, code){ return '<pre><code>' + escapeHtml(code) + '</code></pre>'; });
+    // inline code using backticks
+    md = md.replace(/\\\`([^\\\`]+)\\\`/g, function(_, c){ return '<code>' + escapeHtml(c) + '</code>'; });
+    md = md.replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>');
+    md = md.replace(/\\*([^*]+)\\*/g, '<em>$1</em>');
+    md = md.replace(/(https?:\\/\\/[^\\s]+)/g, '<a href=\"$1\" target=\"_blank\" rel=\"noopener\">$1</a>');
+    md = md.replace(/\\n/g, '<br/>');
+    return md;
+  }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c])); }
+
+  // send wrapper (uses ws if open, otherwise queue)
+  function send(obj) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(obj));
+    } else {
+      pendingQueue.push(obj);
+      savePending();
+    }
+  }
+
+  // pending queue saved in localStorage
+  function savePending() { localStorage.setItem('pending_queue', JSON.stringify(pendingQueue)); }
+  function loadPending() { pendingQueue = JSON.parse(localStorage.getItem('pending_queue') || '[]') || []; }
+
+  // file upload -> convert to base64
+  function fileToBase64(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res({ data: r.result, name: file.name, type: file.type });
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+  }
+
+  // Notifications
+  function notify(title, body) {
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(p => { if (p === 'granted') new Notification(title, { body }); });
+    }
+  }
+
+  // EVENTS
+
+  setNameBtn.addEventListener('click', () => {
+    myName = nameInput.value.trim() || 'Anonymous';
+    send({ type: 'set_name', payload: { name: myName }});
+  });
+
+  textInput.addEventListener('input', () => {
+    send({ type: 'typing', payload: { typing: true }});
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => send({ type: 'typing', payload: { typing: false }}), 1200);
+  });
+
+  sendBtn.addEventListener('click', async () => {
+    const text = textInput.value.trim();
+    const files = fileInput.files;
+    if (!text && files.length === 0) return;
+    const attachments = [];
+    for (let f of files) {
+      const b = await fileToBase64(f);
+      attachments.push(b);
+    }
+    const msg = { id: genId(), text, time: Date.now(), attachments, edited: false, reactions: {}, readBy: [], from: myId, fromName: myName, status: 'sending' };
+    addOrUpdateMessage(msg);
+    saveMsgLocal(msg);
+    send({ type: 'message', payload: msg });
+    textInput.value = '';
+    fileInput.value = '';
+  });
+
+  emojiBtn.addEventListener('click', () => {
+    textInput.value += '😀';
+    textInput.focus();
+  });
+
+  // WebSocket handlers
+  ws.addEventListener('open', () => {
+    statusEl.textContent = 'Online';
+    // flush pending
+    loadPending();
+    pendingQueue.forEach(p => ws.send(JSON.stringify(p)));
+    pendingQueue = [];
+    savePending();
+  });
+
+  ws.addEventListener('close', () => {
+    statusEl.textContent = 'Offline';
+  });
+
+  ws.addEventListener('message', async (ev) => {
+    let data;
+    try { data = JSON.parse(ev.data); } catch(e){ return; }
+
+    if (data.type === 'init') {
+      myId = data.payload.id;
+      await openDB();
+      const local = await loadMsgsLocal();
+      const merged = [...data.payload.messages];
+      local.forEach(lm => { if (!merged.find(m=>m.id===lm.id)) merged.push(lm); });
+      renderMessages(merged);
+      myName = nameInput.value.trim() || myName;
+      onlineUsers = data.payload.users;
+      renderUsers(onlineUsers);
+    }
+
+    if (data.type === 'presence') {
+      onlineUsers = data.payload.users;
+      renderUsers(onlineUsers);
+    }
+
+    if (data.type === 'typing') {
+      const p = data.payload;
+      typingIndicator.textContent = p.typing ? p.name + ' is typing...' : '';
+    }
+
+    if (data.type === 'message_new') {
+      const m = data.payload;
+      addOrUpdateMessage(m);
+      notify('New message from ' + m.fromName, (m.text || '').slice(0,80));
+      send({ type: 'read', payload: { id: m.id, userId: myId }});
+    }
+
+    if (data.type === 'message_ack') {
+      const { id, status } = data.payload;
+      const el = messagesEl.querySelector('[data-id=\"' + id + '\"]');
+      if (el) el.querySelector('.status').textContent = status;
+    }
+
+    if (data.type === 'message_edit') {
+      const { id, text } = data.payload;
+      const el = messagesEl.querySelector('[data-id=\"' + id + '\"]');
+      if (el) {
+        const content = el.querySelector('.content');
+        content.innerHTML = markdownToHtml(text);
+      }
+      saveMsgLocal({ id, text, edited: true });
+    }
+
+    if (data.type === 'message_delete') {
+      const { id } = data.payload;
+      const el = messagesEl.querySelector('[data-id=\"' + id + '\"]');
+      if (el) {
+        el.querySelector('.content').textContent = '[message deleted]';
+      }
+    }
+
+    if (data.type === 'reaction') {
+      const { id, reactions } = data.payload;
+      const el = messagesEl.querySelector('[data-id=\"' + id + '\"]');
+      if (el) {
+        const rw = el.querySelector('.reactions');
+        rw.innerHTML = '';
+        for (const r in reactions) {
+          const s = document.createElement('span'); s.textContent = r + ' ' + reactions[r].length; rw.appendChild(s);
+        }
+      }
+    }
+
+    if (data.type === 'read') {
+      const { id, readBy } = data.payload;
+      const el = messagesEl.querySelector('[data-id=\"' + id + '\"]');
+      if (el) el.querySelector('.status').textContent = 'read ' + readBy.length;
+    }
+  });
+
+  function renderUsers(users) {
+    usersList.innerHTML = '';
+    users.forEach(u => {
+      const li = document.createElement('li');
+      li.textContent = u.name + (u.id === myId ? ' (you)' : '');
+      usersList.appendChild(li);
+    });
+  }
+
+  (async () => {
+    await openDB();
+    const local = await loadMsgsLocal();
+    if (local.length) renderMessages(local);
+    loadPending();
+  })();
+
+})();
+`;
+
+// write files (overwrite to ensure latest)
+fs.writeFileSync(path.join(PUBLIC_DIR, 'index.html'), INDEX_HTML, 'utf8');
+fs.writeFileSync(path.join(PUBLIC_DIR, 'style.css'), STYLE_CSS, 'utf8');
+fs.writeFileSync(path.join(PUBLIC_DIR, 'client.js'), CLIENT_JS, 'utf8');
+
+console.log('Wrote public/index.html, public/style.css, public/client.js');
+
+// ----------------- WebSocket + static server -----------------
+const app = express();
+app.use(express.static(PUBLIC_DIR));
+
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
+const clients = new Map(); // ws -> {id, name}
+const messages = []; // in-memory message store (demo)
+
+function broadcast(data, except = null) {
+  const s = JSON.stringify(data);
+  for (const [ws] of clients) {
+    if (ws !== except && ws.readyState === ws.OPEN) ws.send(s);
+  }
+}
+function sendTo(ws, data) {
+  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(data));
+}
+
+wss.on('connection', (ws) => {
+  const id = 'u_' + Math.random().toString(36).slice(2,9);
+  clients.set(ws, { id, name: 'Anonymous' });
+
+  sendTo(ws, { type: 'init', payload: { id, messages, users: Array.from(clients.values()) } });
+  broadcast({ type: 'presence', payload: { users: Array.from(clients.values()) } }, ws);
+
+  ws.on('message', (raw) => {
+    let msg;
+    try { msg = JSON.parse(raw); } catch(e) { return; }
+    const meta = clients.get(ws);
+
+    if (msg.type === 'set_name') {
+      meta.name = String(msg.payload.name).slice(0,30) || meta.name;
+      broadcast({ type: 'presence', payload: { users: Array.from(clients.values()) } });
+      return;
+    }
+
+    if (msg.type === 'typing') {
+      broadcast({ type: 'typing', payload: { userId: meta.id, name: meta.name, typing: msg.payload.typing } }, ws);
+      return;
+    }
+
+    if (msg.type === 'message') {
+      const message = Object.assign({}, msg.payload, { from: meta.id, fromName: meta.name, status: 'delivered' });
+      messages.push(message);
+      sendTo(ws, { type: 'message_ack', payload: { id: message.id, status: 'delivered' } });
+      broadcast({ type: 'message_new', payload: message }, ws);
+      return;
+    }
+
+    if (msg.type === 'message_edit') {
+      const { id: mid, text } = msg.payload;
+      const m = messages.find(x => x.id === mid);
+      if (m) { m.text = text; m.edited = true; broadcast({ type: 'message_edit', payload: { id: mid, text } }); }
+      return;
+    }
+
+    if (msg.type === 'message_delete') {
+      const { id: mid } = msg.payload;
+      const idx = messages.findIndex(x => x.id === mid);
+      if (idx !== -1) { messages[idx].deleted = true; broadcast({ type: 'message_delete', payload: { id: mid } }); }
+      return;
+    }
+
+    if (msg.type === 'reaction') {
+      const { id: mid, reaction, userId } = msg.payload;
+      const m = messages.find(x => x.id === mid);
+      if (m) {
+        m.reactions = m.reactions || {};
+        m.reactions[reaction] = m.reactions[reaction] || [];
+        if (!m.reactions[reaction].includes(userId)) m.reactions[reaction].push(userId);
+        broadcast({ type: 'reaction', payload: { id: mid, reactions: m.reactions } });
+      }
+      return;
+    }
+
+    if (msg.type === 'read') {
+      const { id: mid, userId } = msg.payload;
+      const m = messages.find(x => x.id === mid);
+      if (m) {
+        m.readBy = m.readBy || [];
+        if (!m.readBy.includes(userId)) m.readBy.push(userId);
+        broadcast({ type: 'read', payload: { id: mid, readBy: m.readBy } });
+      }
+      return;
+    }
+  });
+
+  ws.on('close', () => {
+    clients.delete(ws);
+    broadcast({ type: 'presence', payload: { users: Array.from(clients.values()) } });
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log('Server running on http://localhost:' + PORT));
