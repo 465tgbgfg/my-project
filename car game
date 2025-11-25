@@ -1,0 +1,58 @@
+import pygame
+import random
+
+
+pygame.init()
+
+# Window setup
+WIDTH, HEIGHT = 500, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Car Racing Animation")
+
+clock = pygame.time.Clock()
+
+# Load car image
+car = pygame.image.load("c:\\Users\\Admin\\.vscode\\WhatsApp Image 2025-11-25 at 09.12.40_4736953c.jpg")  # 👉 yaha apni car image ka path do
+car = pygame.transform.scale(car, (80, 140))
+
+car_x = WIDTH // 2 - 30
+car_y = HEIGHT - 150
+speed = 7
+
+# Road lines
+road_lines = [0, 150, 300, 450]
+
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    keys = pygame.key.get_pressed()
+
+    # Move car left/right
+    if keys[pygame.K_LEFT] and car_x > 120:
+        car_x -= speed
+    if keys[pygame.K_RIGHT] and car_x < WIDTH - 180:
+        car_x += speed
+
+    # Background
+    screen.fill((40, 40, 40))
+
+    # Road center strip
+    pygame.draw.rect(screen, (60, 60, 60), (100, 0, 300, HEIGHT))
+
+    # Animating road lines
+    for i in range(len(road_lines)):
+        pygame.draw.rect(screen, (255, 255, 255), (240, road_lines[i], 20, 80))
+        road_lines[i] += 10
+        if road_lines[i] > HEIGHT:
+            road_lines[i] = -80
+
+    # Draw car
+    screen.blit(car, (car_x, car_y))
+
+    pygame.display.update()
+    clock.tick(60)
+
+pygame.quit()
