@@ -1,0 +1,145 @@
+import pygame
+import random
+import math
+
+"""
+🔥 NEW GAME: NINJA RUN – ULTIMATE ACTION GAME
+Features:
+- Fast movement
+- Sliding, jumping
+- Enemies
+- Coins
+- Score system
+- Smooth animations
+
+Controls:
+LEFT / RIGHT = Move
+UP = Jump
+DOWN = Slide
+
+"""
+
+pygame.init()
+WIDTH, HEIGHT = 900, 500
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("🔥 Ninja Run – Ultra Action Game")
+clock = pygame.time.Clock()
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 50, 50)
+
+# Ninja settings
+ninja_x = 100
+ninja_y = 380
+ninja_width = 40
+ninja_height = 60
+y_vel = 0
+is_jumping = False
+is_sliding = False
+slide_timer = 0
+
+# Gravity
+GRAVITY = 1
+
+# Enemy list
+enemies = []
+ENEMY_SPEED = 7
+SPAWN_RATE = 30
+
+# Coins
+coins = []
+COIN_SIZE = 20
+score = 0
+
+running = True
+frame = 0
+
+while running:
+    clock.tick(60)
+    frame += 1
+    screen.fill(WHITE)
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    keys = pygame.key.get_pressed()
+
+    # JUMP
+    if not is_sliding:
+        if keys[pygame.K_UP] and not is_jumping:
+            is_jumping = True
+            y_vel = -18
+
+    # SLIDE
+    if keys[pygame.K_DOWN] and not is_sliding and not is_jumping:
+        is_sliding = True
+        slide_timer = 20
+        ninja_height = 30
+        ninja_y = 410
+
+    if is_sliding:
+        slide_timer -= 1
+        if slide_timer <= 0:
+            is_sliding = False
+            ninja_height = 60
+            ninja_y = 380
+
+    # Apply gravity
+    if is_jumping:
+        ninja_y += y_vel
+        y_vel += GRAVITY
+
+        if ninja_y >= 380:
+            ninja_y = 380
+            is_jumping = False
+
+    # Enemy spawn
+    if frame % SPAWN_RATE == 0:
+        enemies.append([WIDTH + 20, 420])
+
+    # Move enemies
+    for enemy in enemies:
+        enemy[0] -= ENEMY_SPEED
+        pygame.draw.rect(screen, RED, (enemy[0], enemy[1], 40, 40))
+
+    # Remove off-screen enemies
+    enemies = [e for e in enemies if e[0] > -50]
+
+    # Coin spawn
+    if frame % 90 == 0:
+        coins.append([WIDTH, random.randint(300, 380)])
+
+    # Move coins
+    for coin in coins:
+        coin[0] -= 6
+        pygame.draw.circle(screen, (255, 215, 0), (coin[0], coin[1]), COIN_SIZE)
+
+    # Remove collected coins
+    new_coins = []
+    for coin in coins:
+        dist = math.hypot(ninja_x - coin[0], ninja_y - coin[1])
+        if dist < 40:
+            score += 10
+        else:
+            new_coins.append(coin)
+    coins = new_coins
+
+    # COLLISION with enemies
+    for e in enemies:
+        if abs(ninja_x - e[0]) < 40 and abs(ninja_y - e[1]) < 40:
+            running = False
+
+    # Draw Ninja
+    pygame.draw.rect(screen, BLACK, (ninja_x, ninja_y, ninja_width, ninja_height))
+
+    # Score text
+    font = pygame.font.SysFont("Arial", 30)
+    text = font.render(f"Score: {score}", True, BLACK)
+    screen.blit(text, (20, 20))
+
+    pygame.display.update()
+
+pygame.quit()
