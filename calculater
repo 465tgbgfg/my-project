@@ -1,0 +1,115 @@
+import tkinter as tk
+from math import sin, cos, tan, sqrt, radians, factorial
+
+# --------------------------
+# Window setup
+# --------------------------
+root = tk.Tk()
+root.title("Advanced Calculator - Bhavin")
+root.geometry("480x600")
+root.config(bg="#0f172a")
+
+# --------------------------
+# Variables
+# --------------------------
+expression = ""
+history = []
+redo_stack = []
+input_text = tk.StringVar()
+
+# --------------------------
+# Functions
+# --------------------------
+def press(value):
+    global expression
+    expression += str(value)
+    input_text.set(expression)
+    history.append(expression)
+    redo_stack.clear()
+
+def clear():
+    global expression
+    expression = ""
+    input_text.set("")
+    history.append(expression)
+    redo_stack.clear()
+
+def undo():
+    global expression
+    if history:
+        redo_stack.append(expression)
+        history.pop()
+        expression = history[-1] if history else ""
+        input_text.set(expression)
+
+def redo():
+    global expression
+    if redo_stack:
+        expression = redo_stack.pop()
+        input_text.set(expression)
+        history.append(expression)
+
+def calculate():
+    global expression
+    try:
+        # Replace custom functions with Python eval
+        expr = expression.replace("√", "sqrt")
+        expr = expr.replace("sin", "sin(radians")
+        expr = expr.replace("cos", "cos(radians")
+        expr = expr.replace("tan", "tan(radians")
+        expr = expr.replace("sec", "1/cos(radians")
+        expr = expr.replace("cosec", "1/sin(radians)")
+        result = eval(expr)
+        input_text.set(str(result))
+        expression = str(result)
+        history.append(expression)
+        redo_stack.clear()
+    except Exception as e:
+        input_text.set("Error")
+        expression = ""
+
+# --------------------------
+# UI Components
+# --------------------------
+display = tk.Entry(root, font=("Arial", 28, "bold"), textvariable=input_text,
+                   bd=8, bg="#1E293B", fg="white", justify='right')
+display.grid(row=0, column=0, columnspan=6, pady=20, sticky="we")
+
+buttons = [
+    ("7",1,0),("8",1,1),("9",1,2),("/",1,3),("Undo",1,4),("Redo",1,5),
+    ("4",2,0),("5",2,1),("6",2,2),("*",2,3),("%",2,4),("√",2,5),
+    ("1",3,0),("2",3,1),("3",3,2),("-",3,3),("sin",3,4),("cos",3,5),
+    ("0",4,0),(".",4,1),("=",4,2),("+",4,3),("tan",4,4),("sec",4,5),
+    ("C",5,0),("(",5,1),(")",5,2),("!",5,3),("cosec",5,4)
+]
+
+for (text,row,col) in buttons:
+    if text=="=":
+        b = tk.Button(root,text=text,bg="#10B981",fg="white",font=("Arial",18,"bold"),
+                      command=calculate)
+    elif text=="C":
+        b = tk.Button(root,text=text,bg="#EF4444",fg="white",font=("Arial",18,"bold"),
+                      command=clear)
+    elif text=="Undo":
+        b = tk.Button(root,text=text,bg="#F59E0B",fg="white",font=("Arial",18,"bold"),
+                      command=undo)
+    elif text=="Redo":
+        b = tk.Button(root,text=text,bg="#F59E0B",fg="white",font=("Arial",18,"bold"),
+                      command=redo)
+    else:
+        b = tk.Button(root,text=text,bg="#3B82F6",fg="white",font=("Arial",18,"bold"),
+                      command=lambda t=text: press(t))
+    b.grid(row=row,column=col,padx=5,pady=5,sticky="nsew")
+
+# --------------------------
+# Make grid expandable
+# --------------------------
+for i in range(6):
+    root.grid_rowconfigure(i, weight=1)
+for i in range(6):
+    root.grid_columnconfigure(i, weight=1)
+
+# --------------------------
+# Run calculator
+# --------------------------
+root.mainloop()
