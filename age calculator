@@ -1,0 +1,100 @@
+from tkinter import *
+from datetime import date
+
+# Main window
+root = Tk()
+root.title("Age Calculator")
+root.geometry("420x420")
+root.config(bg="#1e1e2f")
+root.resizable(False, False)
+
+# Title
+Label(
+    root,
+    text="AGE CALCULATOR",
+    font=("Arial", 20, "bold"),
+    bg="#1e1e2f",
+    fg="#00ffcc"
+).pack(pady=15)
+
+# Frame
+frame = Frame(root, bg="#2c2c3e", bd=5, relief=RIDGE)
+frame.pack(pady=20)
+
+# Labels & Entry
+def label_text(text, row):
+    Label(
+        frame,
+        text=text,
+        font=("Arial", 12),
+        bg="#2c2c3e",
+        fg="white"
+    ).grid(row=row, column=0, padx=10, pady=10)
+
+def entry_box(row):
+    e = Entry(frame, font=("Arial", 12), width=15)
+    e.grid(row=row, column=1, padx=10)
+    return e
+
+label_text("Birth Day:", 0)
+day = entry_box(0)
+
+label_text("Birth Month:", 1)
+month = entry_box(1)
+
+label_text("Birth Year:", 2)
+year = entry_box(2)
+
+# Result Label
+result = Label(
+    root,
+    text="Your Age Will Appear Here",
+    font=("Arial", 14, "bold"),
+    bg="#1e1e2f",
+    fg="#ffcc00"
+)
+result.pack(pady=20)
+
+# Age Calculation Function
+def calculate_age():
+    try:
+        d = int(day.get())
+        m = int(month.get())
+        y = int(year.get())
+
+        today = date.today()
+        birth_date = date(y, m, d)
+
+        age_years = today.year - birth_date.year
+        age_months = today.month - birth_date.month
+        age_days = today.day - birth_date.day
+
+        if age_days < 0:
+            age_months -= 1
+            age_days += 30
+
+        if age_months < 0:
+            age_years -= 1
+            age_months += 12
+
+        result.config(
+            text=f"Age: {age_years} Years {age_months} Months {age_days} Days",
+            fg="#00ff99"
+        )
+
+    except:
+        result.config(text="❌ Please enter valid numbers", fg="red")
+
+# Button
+Button(
+    root,
+    text="CALCULATE AGE",
+    font=("Arial", 14, "bold"),
+    bg="#00ffcc",
+    fg="black",
+    padx=20,
+    pady=5,
+    command=calculate_age
+).pack(pady=10)
+
+root.mainloop()
