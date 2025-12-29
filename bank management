@@ -1,0 +1,275 @@
+from tkinter import *
+from tkinter import ttk, messagebox
+import sqlite3
+import datetime
+import os
+
+# ================= DATABASE =================
+class BankDatabase:
+    def __init__(self):
+        self.conn = sqlite3.connect("bank.db")
+        self.cur = self.conn.cursor()
+        self.create_tables()
+
+    def create_tables(self):
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS admin(
+            username TEXT PRIMARY KEY,
+            password TEXT
+        )
+        """)
+
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS accounts(
+            acc_no INTEGER PRIMARY KEY,
+            name TEXT,
+            mobile TEXT,
+            address TEXT,
+            balance REAL,
+            created_on TEXT
+        )
+        """)
+
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS transactions(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            acc_no INTEGER,
+            type TEXT,
+            amount REAL,
+            date TEXT,
+            note TEXT
+        )
+        """)
+
+        # default admin
+        self.cur.execute("SELECT * FROM admin")
+        if not self.cur.fetchone():
+            self.cur.execute(
+                "INSERT INTO admin VALUES (?,?)",
+                ("admin", "admin123")
+            )
+
+        self.conn.commit()
+
+    def validate_login(self, user, pwd):
+        self.cur.execute(
+            "SELECT * FROM admin WHERE username=? AND password=?",
+            (user, pwd)
+        )
+        return self.cur.fetchone()
+
+    def add_account(self, acc, name, mobile, address, balance):
+        date = datetime.datetime.now().strftime("%d-%m-%Y")
+        self.cur.execute("""
+        INSERT INTO accounts VALUES (?,?,?,?,?,?)=
+        """, (acc, name, mobile, address, balance, date))
+        self.conn.commit()
+
+    def get_all_accounts(self):
+        self.cur.execute("SELECT * FROM accounts")
+        return self.cur.fetchall()
+
+    def get_account(self, acc):
+        self.cur.execute("SELECT * FROM accounts WHERE acc_no=?", (acc,))
+        return self.cur.fetchone()
+
+    def update_balance(self, acc, balance):
+        self.cur.execute(
+            "UPDATE accounts SET balance=? WHERE acc_no=?","""''"""
+            (balance, acc)
+        )
+        self.conn.commit()
+
+    def add_transaction(self, acc, ttype, amount, note=""):
+        date = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
+        self.cur.execute("""
+        INSERT INTO transactions VALUES (NULL,?,?,?,?,?)
+        """, (acc, ttype, amount, date, note))
+        self.conn.commit()
+
+    def get_transactions(self, acc):
+        self.cur.execute(
+            "SELECT * FROM transactions WHERE acc_no=?",
+            (acc,)
+        )
+        return self.cur.fetchall()
+
+    def delete_account(self, acc):
+        self.cur.execute("DELETE FROM accounts WHERE acc_no=?", (acc,))
+        self.cur.execute("DELETE FROM transactions WHERE acc_no=?", (acc,))
+        self.conn.commit()
+
+
+# ================= LOGIN WINDOW =================
+class LoginWindow:
+    def __init__(self, root):
+        self.db = BankDatabase()
+        self.root = root
+        self.root.title("Bank Login")
+        self.root.geometry("400x300")
+        self.root.config(bg="#2c3e50")
+
+        Label(root, text="BANK LOGIN",
+              font=("Arial", 20, "bold"),
+              bg="#2c3e50", fg="white").pack(pady=20)
+
+        self.user = StringVar()
+        self.pwd = StringVar()
+
+        Label(root, text="Username",
+              bg="#2c3e50", fg="white").pack()
+        Entry(root, textvariable=self.user).pack(pady=5)
+
+        Label(root, text="Password",
+              bg="#2c3e50", fg="white").pack()
+        Entry(root, textvariable=self.pwd, show="*").pack(pady=5)
+
+        Button(root, text="Login",
+               font=("Arial", 12, "bold"),
+               bg="#27ae60", fg="white",
+               command=self.login).pack(pady=20)
+
+    def login(self):
+        if self.db.validate_login(self.user.get(), self.pwd.get()):
+            self.root.destroy()
+            root = Tk()
+            Dashboard(root)
+            root.mainloop()
+        else:
+            messagebox.showerror("Error", "Invalid Login")
+
+
+# ================= DASHBOARD =================
+class Dashboard:
+    def __init__(self, root):
+        self.db = BankDatabase()
+        self.root = root
+        self.root.title("Bank Management System")
+        self.root.geometry("1100x650")
+        self.root.config(bg="#ecf0f1")
+
+        self.acc = StringVar()
+        self.name = StringVar()
+        self.mobile = StringVar()
+        self.amount = StringVar()
+
+        self.create_ui()
+        self.load_accounts()
+
+    def create_ui(self):
+        Label(self.root, text="BANK MANAGEMENT SYSTEM",
+              font=("Arial", 22, "bold"),
+              bg="#34495e", fg="white").pack(fill=X)
+
+        # LEFT PANEL
+        left = Frame(self.root, bg="white")
+        left.place(x=20, y=80, width=420, height=540)
+
+        Label(left, text="Account Section",
+              font=("Arial", 15, "bold"),
+              bg="white").pack(pady=10)
+
+        self.create_entry(left, "Account No", self.acc)
+        self.create_entry(left, "Name", self.name)
+        self.create_entry(left, "Mobile", self.mobile)
+
+        Label(left, text="Address", bg="white").pack(anchor=W, padx=20)
+        self.address = Text(left, height=3)
+        self.address.pack(fill=X, padx=20, pady=5)
+
+        self.create_entry(left, "Amount", self.amount)
+
+        Button(left, text="Open Account",
+               bg="#2ecc71", fg="white",
+               command=self.open_account).pack(fill=X, padx=20, pady=5)
+
+        Button(left, text="Deposit",
+               bg="#3498db", fg="white",
+               command=self.deposit).pack(fill=X, padx=20, pady=5)
+
+        Button(left, text="Withdraw",
+               bg="#e67e22", fg="white",
+               command=self.withdraw).pack(fill=X, padx=20, pady=5)
+
+        Button(left, text="Delete Account",
+               bg="#e74c3c", fg="white",
+               command=self.delete_account).pack(fill=X, padx=20, pady=5)
+
+        # RIGHT PANEL
+        right = Frame(self.root, bg="white")
+        right.place(x=470, y=80, width=600, height=540)
+
+        self.table = ttk.Treeview(
+            right,
+            columns=("acc","name","mobile","address","balance","date"),
+            show="headings"
+        )
+
+        for col in ("acc","name","mobile","address","balance","date"):
+            self.table.heading(col, text=col.upper())
+
+        self.table.pack(fill=BOTH, expand=1)
+        self.table.bind("<ButtonRelease-1>", self.select_row)
+
+    def create_entry(self, parent, text, var):
+        Label(parent, text=text, bg="white").pack(anchor=W, padx=20)
+        Entry(parent, textvariable=var).pack(fill=X, padx=20, pady=5)
+
+    # ================= FUNCTIONS =================
+    def open_account(self):
+        self.db.add_account(
+            int(self.acc.get()),
+            self.name.get(),
+            self.mobile.get(),
+            self.address.get("1.0", END),
+            float(self.amount.get())
+        )
+        self.db.add_transaction(self.acc.get(), "OPEN", self.amount.get())
+        self.load_accounts()
+        messagebox.showinfo("Success", "Account Opened")
+
+    def deposit(self):
+        data = self.db.get_account(self.acc.get())
+        if data:
+            new_bal = data[4] + float(self.amount.get())
+            self.db.update_balance(self.acc.get(), new_bal)
+            self.db.add_transaction(self.acc.get(), "DEPOSIT", self.amount.get())
+            self.load_accounts()
+            messagebox.showinfo("Success", "Deposit Successful")
+
+    def withdraw(self):
+        data = self.db.get_account(self.acc.get())
+        if data and data[4] >= float(self.amount.get()):
+            new_bal = data[4] - float(self.amount.get())
+            self.db.update_balance(self.acc.get(), new_bal)
+            self.db.add_transaction(self.acc.get(), "WITHDRAW", self.amount.get())
+            self.load_accounts()
+            messagebox.showinfo("Success", "Withdraw Successful")
+        else:
+            messagebox.showerror("Error", "Insufficient Balance")
+
+    def delete_account(self):
+        self.db.delete_account(self.acc.get())
+        self.load_accounts()
+        messagebox.showinfo("Deleted", "Account Deleted")
+
+    def load_accounts(self):
+        self.table.delete(*self.table.get_children())
+        for row in self.db.get_all_accounts():
+            self.table.insert("", END, values=row)
+
+    def select_row(self, e):
+        row = self.table.item(self.table.focus())["values"]
+        if row:
+            self.acc.set(row[0])
+            self.name.set(row[1])
+            self.mobile.set(row[2])
+            self.address.delete("1.0", END)
+            self.address.insert(END, row[3])
+            self.amount.set(row[4])
+
+
+# ================= RUN =================
+root = Tk()
+LoginWindow(root)
+root.mainloop()
